@@ -8,6 +8,18 @@ metadata:
 spec:
   nodeName: rke2-02
   containers:
+  initContainers:
+    - name: add-lab-route
+      image: nicolaka/netshoot
+      command:
+        - /bin/sh
+        - -c
+        - |
+          ip route add 129.97.168.0/24 via 10.10.10.1 dev net1 || true
+      securityContext:
+        capabilities:
+          add:
+            - NET_ADMIN
     - name: netshoot
       image: nicolaka/netshoot
       command: ["sleep", "infinity"]
