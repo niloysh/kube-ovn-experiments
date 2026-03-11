@@ -1,0 +1,25 @@
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: lan-red
+spec:
+  protocol: IPv4
+  provider: lan.red
+  cidrBlock: 10.10.10.0/24
+  gateway: 10.10.10.1
+  excludeIps:
+    - 10.10.10.1..10.10.10.50
+    - 10.10.10.61..10.10.10.254
+---
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: lan-blue
+spec:
+  protocol: IPv4
+  provider: lan.blue
+  cidrBlock: 10.10.10.0/24
+  gateway: 10.10.10.1
+  excludeIps:
+    - 10.10.10.1..10.10.10.60
+    - 10.10.10.71..10.10.10.254
