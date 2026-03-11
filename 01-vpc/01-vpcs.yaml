@@ -1,0 +1,15 @@
+apiVersion: kubeovn.io/v1
+kind: Vpc
+metadata:
+  name: red-vpc
+spec:
+  namespaces:
+    - red
+---
+apiVersion: kubeovn.io/v1
+kind: Vpc
+metadata:
+  name: blue-vpc
+spec:
+  namespaces:
+    - blue

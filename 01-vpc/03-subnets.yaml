@@ -1,0 +1,29 @@
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: attachnet-red
+spec:
+  vpc: red-vpc
+  namespaces:
+    - red
+  protocol: IPv4
+  provider: attachnet.red.ovn
+  cidrBlock: 172.30.0.0/24
+  gateway: 172.30.0.1
+  excludeIps:
+    - 172.30.0.1
+---
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: attachnet-blue
+spec:
+  vpc: blue-vpc
+  namespaces:
+    - blue
+  protocol: IPv4
+  provider: attachnet.blue.ovn
+  cidrBlock: 172.30.0.0/24
+  gateway: 172.30.0.1
+  excludeIps:
+    - 172.30.0.1
