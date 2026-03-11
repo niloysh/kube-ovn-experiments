@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: red
+---
+apiVersion: kubeovn.io/v1
+kind: Vpc
+metadata:
+  name: red-vpc
+spec:
+  staticRoutes:
+    - cidr: 0.0.0.0/0
+      nextHopIP: 172.30.0.254
+      policy: policyDst
+---
+# Primary pod subnet for eth0 inside red namespace.
+# This is REQUIRED so Kube-OVN can allocate the main pod address (provider=ovn).
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: red-default
+spec:
+  vpc: red-vpc
+  protocol: IPv4
+  provider: ovn
+  cidrBlock: 172.31.0.0/24
+  gateway: 172.31.0.1
+  namespaces:
+    - red
+  excludeIps:
+    - 172.31.0.1
+---
+# Secondary subnet used by the NAT GW and the pod's extra interface.
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: attachnet-red
+spec:
+  vpc: red-vpc
+  protocol: IPv4
+  provider: attachnet.red.ovn
+  cidrBlock: 172.30.0.0/24
+  gateway: 172.30.0.1
+  excludeIps:
+    - 172.30.0.1
+    - 172.30.0.254
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: attachnet
+  namespace: red
+spec:
+  config: '{
+    "cniVersion": "0.3.0",
+    "type": "kube-ovn",
+    "server_socket": "/run/openvswitch/kube-ovn-daemon.sock",
+    "provider": "attachnet.red.ovn"
+  }'
+---
+apiVersion: kubeovn.io/v1
+kind: Subnet
+metadata:
+  name: ovn-vpc-external-network
+spec:
+  protocol: IPv4
+  provider: ovn-vpc-external-network.kube-system
+  cidrBlock: 10.10.10.0/24
+  gateway: 10.10.10.1
+  excludeIps:
+    - 10.10.10.1..10.10.10.80
+    - 10.10.10.83..10.10.10.254
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: ovn-vpc-external-network
+  namespace: kube-system
+spec:
+  config: '{
+    "cniVersion": "0.3.0",
+    "type": "macvlan",
+    "master": "eth0",
+    "mode": "bridge",
+    "ipam": {
+      "type": "kube-ovn",
+      "server_socket": "/run/openvswitch/kube-ovn-daemon.sock",
+      "provider": "ovn-vpc-external-network.kube-system"
+    }
+  }'
+---
+apiVersion: kubeovn.io/v1
+kind: VpcNatGateway
+metadata:
+  name: red-gw
+spec:
+  vpc: red-vpc
+  subnet: attachnet-red
+  lanIp: 172.30.0.254
+  selector:
+    - "kubernetes.io/hostname: rke2-02"
+    - "kubernetes.io/os: linux"
+  externalSubnets:
+    - ovn-vpc-external-network
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: red-pod
+  namespace: red
+  annotations:
+    # Attach secondary NIC from attachnet NAD.
+    # IMPORTANT: use plain IP, not CIDR.
+    k8s.v1.cni.cncf.io/networks: |
+      [{
+        "name": "attachnet",
+        "namespace": "red",
+        "interface": "net1",
+        "ips": ["172.30.0.2"]
+      }]
+spec:
+  initContainers:
+    - name: setup-routing
+      image: nicolaka/netshoot
+      securityContext:
+        capabilities:
+          add: ["NET_ADMIN"]
+      command:
+        - sh
+        - -c
+        - |
+          set -eux
+
+          ip -o -4 addr show dev net1
+          ip -o -4 addr show dev net1 | grep -q '172.30.0.2/24'
+
+          ip rule add from 172.30.0.2/32 table 100
+          ip route add 172.30.0.0/24 dev net1 scope link table 100
+          ip route add default via 172.30.0.254 dev net1 table 100
+
+          echo "=== ip addr ==="
+          ip -o -4 addr show
+          echo "=== ip rule ==="
+          ip rule show
+          echo "=== table 100 ==="
+          ip route show table 100
+  containers:
+    - name: netshoot
+      image: nicolaka/netshoot
+      command: ["sleep", "infinity"]
+---
+apiVersion: kubeovn.io/v1
+kind: IptablesEIP
+metadata:
+  name: red-eip
+spec:
+  natGwDp: red-gw
+  externalSubnet: ovn-vpc-external-network
+  v4ip: 10.10.10.82
+---
+apiVersion: kubeovn.io/v1
+kind: IptablesFIPRule
+metadata:
+  name: red-fip
+spec:
+  eip: red-eip
+  internalIp: 172.30.0.2

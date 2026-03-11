@@ -1,0 +1,13 @@
+apiVersion: kubeovn.io/v1
+kind: VpcNatGateway
+metadata:
+  name: red-gw
+spec:
+  vpc: red-vpc
+  subnet: attachnet-red
+  lanIp: 172.30.0.254
+  selector:
+    - "kubernetes.io/hostname: rke2-02"
+    - "kubernetes.io/os: linux"
+  externalSubnets:
+    - ovn-vpc-external-network

@@ -1,0 +1,16 @@
+apiVersion: kubeovn.io/v1
+kind: IptablesEIP
+metadata:
+  name: red-eip
+spec:
+  natGwDp: red-gw
+  externalSubnet: ovn-vpc-external-network
+  v4ip: 10.10.10.81
+---
+apiVersion: kubeovn.io/v1
+kind: IptablesFIPRule
+metadata:
+  name: red-fip
+spec:
+  eip: red-eip
+  internalIp: 172.30.0.2

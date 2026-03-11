@@ -1,0 +1,11 @@
+apiVersion: kubeovn.io/v1
+kind: Vpc
+metadata:
+  name: red-vpc
+spec:
+  namespaces:
+    - red
+  staticRoutes:
+    - cidr: 0.0.0.0/0
+      nextHopIP: 172.30.0.254
+      policy: policyDst
